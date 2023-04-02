@@ -1,4 +1,5 @@
 import pandas as pd
+import torch
 
 '''
 @Param value: a string value with this format "Hour(s):Minute(s):Second(s)" 
@@ -16,3 +17,7 @@ def convert_to_seconds(value):
             second = 0
             minute += 1
         return hour*3600+minute*60+second
+    
+def train_valid_test(dataset, train_size=0.6, valid_size=0.2, test_size=0.2):
+    return torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
+    

@@ -65,16 +65,4 @@ class Prepropressing:
         X_tensor = torch.tensor(X_prep, dtype=torch.float32)
         y_tensor = torch.tensor(y_OH, dtype=torch.float32)
         
-        dataset_tensor = torch.utils.data.TensorDataset(X_tensor, y_tensor)
-        
-        train_size = int(0.6 * len(dataset_tensor))
-        val_size = len(dataset_tensor) - train_size
-        train_dataset, val_dataset = torch.utils.data.random_split(dataset_tensor, [train_size, val_size])
-            
-        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=3200, shuffle=True)
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=3200, shuffle=True)
-
-        dataloaders = {'train': train_loader, 'val': val_loader}
-        dataset_sizes= {'train': len(train_dataset), 'val': len(val_dataset)}
-        
-        return {'dataloaders': dataloaders, 'dataset_sizes': dataset_sizes, 'input': X_tensor.shape[1], 'output': y_tensor.shape[1]}
+        return torch.utils.data.TensorDataset(X_tensor, y_tensor)

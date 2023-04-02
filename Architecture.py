@@ -107,7 +107,7 @@ class Architecture():
         pass
 
     def train(self, model, criterion, optimizer, dataloaders, dataset_sizes, batch_size, num_epochs=25):
-        train_and_test_nn_centralize(model, criterion, optimizer, dataloaders, dataset_sizes, batch_size, num_epochs=25)
+        train_and_test_nn_centralize(model, criterion, optimizer, dataloaders, dataset_sizes, batch_size, num_epochs)
         
     def valid(self, x):
         pass

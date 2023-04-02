@@ -3,8 +3,9 @@ from Node import Node
 from Global_Node import Global_Node
 from Architecture import Architecture
 from Preprocessing import Prepropressing
+from utility import train_valid_test
 
-
+import torch
 from torch.optim import Adam, lr_scheduler
 from torch.nn import CrossEntropyLoss
 
@@ -12,22 +13,26 @@ import warnings
 warnings.filterwarnings('ignore')
 
 def main():
-    print("Hello World")
-    
     architecture = Architecture()
     
-    example_1 = Prepropressing.first_exemple()
+    # Preprocessing on the data that return a new dataset
+    dataset = Prepropressing.first_exemple()
     
-    model = MyNet(example_1["input"], example_1["output"])
+    train_dataset, valid_dataset, test_dataset = train_valid_test(dataset, 0.8, 0.2, 0.0)
+
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=3200, shuffle=True) 
+    val_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=3200, shuffle=True)
+
+    dataloaders = {'train': train_loader, 'val': val_loader}
+    dataset_sizes= {'train': len(train_dataset), 'val': len(valid_dataset)}
+    
+    model = MyNet(dataset.tensors[0].shape[1:].numel(), dataset.tensors[1].shape[1:].numel())
     
     criterion = CrossEntropyLoss()
     
     optimizer_ft = Adam(model.parameters(), lr=0.001)
 
-    # decay LR by a factor of 0.1 every 5 epochs
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=5, gamma=0.1)
-
-    model_ft = architecture.train(model, criterion, optimizer_ft, example_1["dataloaders"],example_1["dataset_sizes"], 1, num_epochs=10)
+    model_ft = architecture.train(model, criterion, optimizer_ft, dataloaders, dataset_sizes, 1, num_epochs=10)
 
 
 if __name__ == "__main__":
