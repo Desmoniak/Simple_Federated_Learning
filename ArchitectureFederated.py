@@ -206,6 +206,7 @@ class ArchitectureFederated():
             # Print the average loss, accuracy, precision, recall for once for train and val per epoch
             print('AVG Accuracy: %.4f || AVG Precision: %.3f || AVG Recall: %.3f' % 
                 (accuracy_avg, precision_avg, recall_avg))
+            return accuracy_avg
 
 ##############################################################################
 # send_local_model_for_agg
@@ -226,12 +227,14 @@ class ArchitectureFederated():
     def train_and_test_classif(self, nodes, global_model, nb_round, nb_epoch, nb_nodes_selectioned):
         nodes_selectioned = self.selection_nodes(nb_nodes_selectioned, nodes)
         nodes_best_avg = {}
+        node_before_after_agg = {}
         # We send the main model to the selectioned nodes. 
         for node in nodes_selectioned:
             nodes[node] = self.send_global_model_to_node(global_model, nodes[node])
             
         for k in range(nb_round):
-            nodes_best_avg[k] = {} 
+            nodes_best_avg[k] = {}
+            node_before_after_agg[k] = {}
             print("\n")
             print("############################################################")
             print("_________________________Round %d / %d ____________________" % (k+1, nb_round))
@@ -247,9 +250,10 @@ class ArchitectureFederated():
                 
             
             for node in nodes_selectioned :
+                node_before_after_agg[k][node] = {}
                 print(f"_________________________TEST PHASE AVANT AGGREGATION {node}____________________")
                 print("\n")
-                self.test(nodes[node])
+                node_before_after_agg[k][node]["before_agg"] = self.test(nodes[node])
                     
             global_model = self.send_local_model_for_agg(global_model, nodes, nodes_selectioned)
                 
@@ -258,9 +262,21 @@ class ArchitectureFederated():
                 
             for node in nodes_selectioned:
                 print(f"_________________________TEST PHASE APRES AGGREGATION {node}____________________")
-                self.test(nodes[node])
+                node_before_after_agg[k][node]["after_agg"] = self.test(nodes[node])
                 print("\n")
         print(nodes_best_avg)
+        for k in range(nb_round):
+            print("_____________________________________________________________________")
+            print(f"_________________________Results for round {k+1} ____________________")
+            print("_____________________________________________________________________")
+            for node in nodes_selectioned:
+                print(f'Results for {node}')
+                print("Best Accuracy")
+                print(nodes_best_avg[k][node])
+                print("\n")
+                print("Comparaison before and after aggregation")
+                print(node_before_after_agg[k][node])
+                print("\n")
 
 ###############################################################################
 # start_regression
@@ -285,4 +301,4 @@ class ArchitectureFederated():
         }
         
         nodes = self.split_data_nodes(nodes)
-        model_global_final = self.train_and_test_classif(nodes, global_model, 3, 1, 4)
+        model_global_final = self.train_and_test_classif(nodes, global_model, 3, 100, 4)
