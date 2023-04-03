@@ -5,11 +5,11 @@ import time
 import torch
 import torch.nn as nn
 from torch.optim import Adam, lr_scheduler
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
 
 
 # Sklearn
-from sklearn.metrics import precision_score, recall_score
+from sklearn.metrics import precision_score, recall_score, accuracy_score
 
 from utility import train_valid_test
 
@@ -25,7 +25,7 @@ class ArchitectureFederated():
     def __init__(self):
         pass
 
-##############################################################################
+###############################################################################
 # train_and_test_node
 ###############################################################################
     def train_and_test_node(self, node, criterion, optimizer, batch_size_train, batch_size_test, num_epochs=25):
@@ -34,7 +34,6 @@ class ArchitectureFederated():
         val_loader = torch.utils.data.DataLoader(node['data']['valid_data'], batch_size=batch_size_test, shuffle=True)
 
         dataloaders = {'train': train_loader, 'val': val_loader}
-        dataset_sizes= {'train': len(node['data']['train_data']), 'val': len(node['data']['train_data'])}
 
         since = time.time()
         # Instantiate the neural network and the optimizer
@@ -42,8 +41,6 @@ class ArchitectureFederated():
         optimizer = optimizer
         criterion = criterion
         best_acc_avg = 0.0
-
-        #pbar = trange(num_epochs, unit="carrots")
 
         # Train the neural network
         for epoch in range(num_epochs):
@@ -57,7 +54,7 @@ class ArchitectureFederated():
                     model.eval()   # Set model to evaluate mode
 
                 running_loss = 0.0
-                correct = 0
+                accuracy = 0
                 precision = 0.0
                 recall = 0.0
                 i = 0
@@ -78,9 +75,9 @@ class ArchitectureFederated():
                         loss = criterion(outputs, labels)
 
                         running_loss += loss.item()
-                        correct += torch.sum(preds == torch.argmax(labels,1))
-                        precision += precision_score(torch.argmax(labels,1), preds)
-                        recall += recall_score(torch.argmax(labels,1), preds)
+                        accuracy += accuracy_score(labels, preds)
+                        precision += precision_score(labels, preds)
+                        recall += recall_score(labels, preds)
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -94,7 +91,7 @@ class ArchitectureFederated():
                 loss_avg = running_loss / (i+1)
 
                 # Calculate the average accuracy
-                accuracy_avg = correct.double() / dataset_sizes[phase]
+                accuracy_avg = accuracy / (i+1)
 
                 # Calculate the average precision and recall
                 precision_avg = precision / (i+1)
@@ -136,7 +133,7 @@ class ArchitectureFederated():
         Returns:
             _type_: _description_
         """
-        node['model'].load_state_dict(copy.deepcopy(global_model.state_dict()))
+        node['model'].load_state_dict(global_model.state_dict())
         return node
     
 ###############################################################################
@@ -155,7 +152,7 @@ class ArchitectureFederated():
     def split_data_nodes(self, nodes):
     
         for node in nodes.keys():
-            train_dataset, valid_dataset, test_dataset = train_valid_test(nodes[node]['data'], 0.6, 0.3, 0.1)
+            train_dataset, valid_dataset, test_dataset = train_valid_test(nodes[node]['data'], 0.6, 0.2, 0.2)
             nodes[node]['data'] = {'train_data': train_dataset, 'valid_data': valid_dataset, 'test_data': test_dataset}
         return nodes
 
@@ -168,7 +165,7 @@ class ArchitectureFederated():
         model = node['model']
         model.eval() # Set model to evaluate mode
 
-        correct = 0
+        accuracy = 0
         precision = 0.0
         recall = 0.0
         i = 0
@@ -185,16 +182,16 @@ class ArchitectureFederated():
                 outputs = model(inputs)
                 _, preds = torch.max(outputs, 1)
                 
-                correct += torch.sum(preds == torch.argmax(labels,1))
-                precision += precision_score(torch.argmax(labels,1), preds)
-                recall += recall_score(torch.argmax(labels,1), preds)
+                accuracy += accuracy_score(labels, preds)
+                precision += precision_score(labels, preds)
+                recall += recall_score(labels, preds)
                 
                 i+=1
             
             ##Statistics
 
             # Calculate the average accuracy
-            accuracy_avg = correct.double() / len(node['data']['test_data'])
+            accuracy_avg = accuracy / (i+1)
 
             # Calculate the average precision and recall
             precision_avg = precision / (i+1)
@@ -217,7 +214,7 @@ class ArchitectureFederated():
         for node in node_in_training_mode:
             for name, param in nodes[node]["model"].named_parameters():            
                 state_dict[name] = state_dict[name] + nodes[node]["model"].state_dict()[name]
-            state_dict[name] = state_dict[name]/(len(node_in_training_mode)+1)
+            state_dict[name] = state_dict[name]/(len(node_in_training_mode))
             global_model.load_state_dict(state_dict)
         return global_model
 
@@ -228,6 +225,7 @@ class ArchitectureFederated():
         nodes_selectioned = self.selection_nodes(nb_nodes_selectioned, nodes)
         nodes_best_avg = {}
         node_before_after_agg = {}
+        
         # We send the main model to the selectioned nodes. 
         for node in nodes_selectioned:
             nodes[node] = self.send_global_model_to_node(global_model, nodes[node])
@@ -242,30 +240,30 @@ class ArchitectureFederated():
             print("\n")
             for node in nodes_selectioned:
                 print(f"_________________________TRAINING PHASE of {node}____________________")
-                criterion = nn.CrossEntropyLoss()
+                criterion = nn.BCEWithLogitsLoss()
                 optimizer = Adam(nodes[node]['model'].parameters(), lr=0.001)
-                model_best_acc_avg = self.train_and_test_node(nodes[node], criterion, optimizer, 100, 100, num_epochs=nb_epoch)
+                model_best_acc_avg = self.train_and_test_node(nodes[node], criterion, optimizer, 5000, 5000, num_epochs=nb_epoch)
                 nodes[node]['model'] = model_best_acc_avg['model']
                 nodes_best_avg[k][node] = model_best_acc_avg['node_best_acc_avg']
                 
             
-            for node in nodes_selectioned :
+            """  for node in nodes_selectioned :
                 node_before_after_agg[k][node] = {}
                 print(f"_________________________TEST PHASE AVANT AGGREGATION {node}____________________")
                 print("\n")
-                node_before_after_agg[k][node]["before_agg"] = self.test(nodes[node])
+                node_before_after_agg[k][node]["before_agg"] = self.test(nodes[node]) """
                     
             global_model = self.send_local_model_for_agg(global_model, nodes, nodes_selectioned)
                 
             for node in nodes_selectioned:
                 self.send_global_model_to_node(global_model, nodes[node])
                 
-            for node in nodes_selectioned:
+            """ for node in nodes_selectioned:
                 print(f"_________________________TEST PHASE APRES AGGREGATION {node}____________________")
                 node_before_after_agg[k][node]["after_agg"] = self.test(nodes[node])
-                print("\n")
+                print("\n") """
         print(nodes_best_avg)
-        for k in range(nb_round):
+        """ for k in range(nb_round):
             print("_____________________________________________________________________")
             print(f"_________________________Results for round {k+1} ____________________")
             print("_____________________________________________________________________")
@@ -276,7 +274,7 @@ class ArchitectureFederated():
                 print("\n")
                 print("Comparaison before and after aggregation")
                 print(node_before_after_agg[k][node])
-                print("\n")
+                print("\n") """
 
 ###############################################################################
 # start_regression
@@ -287,12 +285,13 @@ class ArchitectureFederated():
 ###############################################################################
 # start_classification
 ###############################################################################
-    def start_classification(self, model, dataset):
+    def start_classification(self, model, dataset, nb_round, nb_epoch):
         global_model = copy.deepcopy(model)
         local_model = copy.deepcopy(model)
         
-        node_1_data, node_2_data, node_3_data, node_4_data, _ = torch.utils.data.random_split(dataset, [10000, 10000, 10000, 10000, len(dataset) - 40000])
-        
+        node_1_data, node_2_data, node_3_data, node_4_data, _ = torch.utils.data.random_split(dataset, [40000, 5000, 1000, 100000, len(dataset) - 146000])
+
+
         nodes = {
             'node_1': {'model': copy.deepcopy(local_model), 'data': node_1_data},
             'node_2': {'model': copy.deepcopy(local_model), 'data': node_2_data},
@@ -301,4 +300,4 @@ class ArchitectureFederated():
         }
         
         nodes = self.split_data_nodes(nodes)
-        model_global_final = self.train_and_test_classif(nodes, global_model, 3, 100, 4)
+        model_global_final = self.train_and_test_classif(nodes, global_model, nb_round, nb_epoch, 4)

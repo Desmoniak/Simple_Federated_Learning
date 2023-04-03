@@ -48,7 +48,7 @@ class Prepropressing:
         X = data_prep[features]
         y = data_prep[target]
 
-        y_OH = OneHotEncoder(handle_unknown='ignore', sparse=False).fit_transform(y)
+        y_OE = OrdinalEncoder().fit_transform(y)
 
         num_cols = ["start_lat", "start_lng", "end_lat", "end_lng", "day_of_week", "ride_length"]
         categorical_cols_less_values = ["member_casual"]
@@ -61,8 +61,7 @@ class Prepropressing:
             ])
 
         X_prep = preprocessor.fit_transform(X)
-        
         X_tensor = torch.tensor(X_prep, dtype=torch.float32)
-        y_tensor = torch.tensor(y_OH, dtype=torch.float32)
+        y_tensor = torch.tensor(y_OE, dtype=torch.float32)
         
         return torch.utils.data.TensorDataset(X_tensor, y_tensor)
