@@ -17,5 +17,5 @@ class MyNet(nn.Module):
         x = relu(self.fc3(x))
         x = relu(self.fc4(x))
         x = relu(self.fc5(x))
-        x = relu(self.fc6(x))
+        x = self.fc6(x)
         return x

@@ -198,7 +198,7 @@ class ArchitectureCentralize():
 # start_classification
 ###############################################################################
     def start_classification(self, model, criterion, optimizer, dataset, train_batch_size, valid_batch_size, num_epochs):
-        model_to_train = copy.deepcopy(model)
+        model_to_train = model
         
         train_dataset, valid_dataset, test_dataset = train_valid_test(dataset, 0.6, 0.2, 0.2)
 
