@@ -3,10 +3,12 @@ import time
 
 # Torch
 import torch
+from torch.optim import Adam, lr_scheduler, SGD
+from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss, MSELoss
 
 # Sklearn
 from sklearn.metrics import precision_score, recall_score, accuracy_score
-from sklearn.model_selection import train_test_split
+from Model import MyNet
 
 from utility import train_valid_test
 
@@ -33,23 +35,20 @@ class ArchitectureCentralize():
         criterion = criterion
         best_acc_avg = 0.0
 
-        #pbar = trange(num_epochs, unit="carrots")
-
         # Train the neural network
         for epoch in range(num_epochs):
             print("\n")
             print("_________________________Epoch %d / %d ____________________" % (epoch+1, num_epochs))
             print("\n")
-            for phase in ['train', 'val']:
+            
+            for phase in ['train', 'valid']:
                 if phase == 'train':
                     model.train()  # Set model to training mode
                 else:
                     model.eval()   # Set model to evaluate mode
 
                 running_loss = 0.0
-                accuracy = 0.0
-                precision = 0.0
-                recall = 0.0
+                correct = 0.0
                 i = 0
 
                 # Iterate over data.
@@ -68,9 +67,7 @@ class ArchitectureCentralize():
                         loss = criterion(outputs, labels)
 
                         running_loss += loss.item()
-                        accuracy += accuracy_score(labels, preds)
-                        precision += precision_score(labels, preds)
-                        recall += recall_score(labels, preds)
+                        correct += torch.sum(labels.squeeze() == preds)
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -84,22 +81,15 @@ class ArchitectureCentralize():
                 loss_avg = running_loss / (i+1)
 
                 # Calculate the average accuracy
-                accuracy_avg = accuracy / (i+1)
-
-                # Calculate the average precision and recall
-                precision_avg = precision / (i+1)
-
-                # Calculate the average recall
-                recall_avg = recall / (i+1)
-
+                accuracy_avg = correct.double() / dataset_sizes[phase]
 
                 # Print the average loss, accuracy, precision, recall for once for train and val per epoch
-                print('PHASE %s:  [AVG loss: %.3f || AVG Accuracy: %.4f] [AVG Precision: %.3f || AVG Recall: %.3f]' % 
-                (phase, loss_avg, accuracy_avg, precision_avg, recall_avg))
+                print('PHASE %s:  [AVG loss: %.3f || AVG Accuracy: %.4f]' % 
+                (phase, loss_avg, accuracy_avg))
                 
 
                 # deep copy the model
-                if phase == 'val' and accuracy_avg > best_acc_avg:
+                if phase == 'valid' and accuracy_avg > best_acc_avg:
                     best_acc_avg = accuracy_avg
                     best_model_wts = copy.deepcopy(model.state_dict())
 
@@ -121,10 +111,7 @@ class ArchitectureCentralize():
         print("_________________________TEST PHASE____________________")
         print("\n")
         
-        accuracy = 0
-        precision = 0.0
-        recall = 0.0
-        i = 0
+        correct = 0.0
 
         # Iterate over data.
         for inputs, labels in test_loader:
@@ -134,26 +121,17 @@ class ArchitectureCentralize():
                 
                 outputs = model(inputs)
                 _, preds = torch.max(outputs, 1)
-                
-                accuracy += accuracy_score(labels, preds)
-                precision += precision_score(labels, preds)
-                recall += recall_score(labels, preds)
-
-
-                i+=1
+                correct += torch.sum(labels.squeeze() == preds)
 
         ##Statistics
         # Calculate the average accuracy
-        accuracy_avg = accuracy / (i+1)
-        # Calculate the average precision and recall
-        precision_avg = precision / (i+1)
-        # Calculate the average recall
-        recall_avg = recall / (i+1)
+        accuracy_avg = correct.double() / test_dataset_size
+        
 
 
         # Print the average accuracy, precision, recall for once for train and val per epoch
-        print('AVG Accuracy: %.4f || AVG Precision: %.3f || AVG Recall: %.3f' % 
-        (accuracy_avg, precision_avg, recall_avg))
+        print('AVG Accuracy: %.4f' % 
+        (accuracy_avg))
         
 ###############################################################################
 # train_and_valid_classif_SVM
@@ -197,18 +175,24 @@ class ArchitectureCentralize():
 ###############################################################################
 # start_classification
 ###############################################################################
-    def start_classification(self, model, criterion, optimizer, dataset, train_batch_size, valid_batch_size, num_epochs):
-        model_to_train = model
+    def start_classification(self, dataset):
+        
+        model = MyNet(dataset.tensors[0].shape[1:].numel(), dataset.tensors[1].shape[1:].numel())
+        criterion = BCEWithLogitsLoss()
+        optimizer = SGD(model.parameters(), lr=0.1)
         
         train_dataset, valid_dataset, test_dataset = train_valid_test(dataset, 0.6, 0.2, 0.2)
 
-        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
-        val_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=valid_batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=3200, shuffle=True)
+        val_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=3200, shuffle=True)
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=True)
 
-        dataloaders = {'train': train_loader, 'val': val_loader}
-        dataset_sizes= {'train': len(train_dataset), 'val': len(valid_dataset)}
+        dataloaders = {'train': train_loader, 'valid': val_loader}
+        dataset_sizes= {'train': len(train_dataset), 'valid': len(valid_dataset)}
 
-        model_final = self.train_and_valid_classif(model_to_train, criterion, optimizer, dataloaders, dataset_sizes, num_epochs)
+        # With a neural network
+        model_final = self.train_and_valid_classif(model, criterion, optimizer, dataloaders, dataset_sizes, 5)
         self.test(model_final, test_loader, len(test_dataset))
+        
+        # With SVM
         #self.train_and_valid_classif_SVM(model, dataset)
