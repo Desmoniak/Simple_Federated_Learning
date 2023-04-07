@@ -20,7 +20,7 @@ class Prepropressing:
     
     def first_exemple():
         
-        dataset = pd.read_csv("./202207-divvy-tripdata.csv") # Replace by your dataset
+        dataset = pd.read_csv("../202207-divvy-tripdata.csv") # Replace by your dataset
         data = dataset.copy() # Copy
 
         data_prep = data.copy()
