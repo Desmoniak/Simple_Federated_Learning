@@ -27,4 +27,4 @@ python.exe -m pip install requirements.txt
 ## Folders
 ---
 * Code/ contains an attempt to split the code of the NoteBooks/Centralized_Learning_2_Federated_Learning.
-* Notebooks/ contains Notebook
+* Notebooks/ contains Notebooks
