@@ -1,2 +1,6 @@
 __pycache__/*
 env/*
+NoteBooks/cache/*
+202207-divvy-tripdata.csv
+NoteBooks/.ipynb_checkpoints/*
+Bike_Data/*
